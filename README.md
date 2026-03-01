@@ -1,137 +1,95 @@
-# Sentient Roundtable
+# Sentient Roundtable Backend
 
-Sentient Roundtable is a multi-agent deliberation system with a React SPA frontend and FastAPI backend.
+This repository contains only the FastAPI backend for Sentient Roundtable.
 
-## V1 Features
+Frontend repo:
+- `https://github.com/anupa-perera/sentient-ai-roundtable`
+
+## Features
 
 - Fixed-round orchestration (`rounds` chosen by user, no early stop).
 - Sequential rotating turn order per round.
-- Real-time SSE discussion stream with replay/resume.
-- Two model access flows:
-  - `system` (default): uses server key, free models only.
-  - `byok`: user key allows paid + free models; key kept in backend RAM only for session lifetime.
-- Post-discussion voting and synthesis.
-- PDF export (`POST /api/export`) only.
+- Real-time SSE stream with replay/resume support.
+- Two access flows:
+  - `system`: server-side key, free models only.
+  - `byok`: user key allows free + paid models, stored in backend RAM for session lifetime only.
+- Voting and synthesis after all rounds.
+- PDF export via `POST /api/export`.
 
-## Monorepo Structure
+## Project Structure
 
 ```text
-backend/   FastAPI + orchestration + Redis + OpenRouter + PDF export
-frontend/  React + Vite + Zustand + SSE live UI
+backend/             FastAPI app, orchestration, Redis/OpenRouter/PDF services
+docker-compose.yml   Backend + local Redis for development
 ```
 
 ## Environment
 
-Copy `.env.example` to `.env` and set values:
+Copy `.env.example` to `.env` and set:
 
-- `OPENROUTER_API_KEY` for system flow.
-- `REDIS_URL` for backend Redis connection.
+- `OPENROUTER_API_KEY`
+- `REDIS_URL` (use `rediss://...` for Upstash)
+- `CORS_ORIGINS` (include your frontend domain)
+- `OPENROUTER_HTTP_REFERER` (set to your frontend domain)
 
-## Local Development
+## Run Locally
 
-### 1) Start backend + Redis
+### Docker (recommended)
 
 ```bash
 docker-compose up -d --build
 ```
 
-Backend API: `http://localhost:8000`  
+API: `http://localhost:8000`  
 Health: `http://localhost:8000/healthz`
 
-### 2) Start frontend
+### Without Docker
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+playwright install chromium
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Frontend: `http://localhost:5173`
+## Deploy (Railway/Render)
 
-## Hosting (Recommended: Vercel + Render + Upstash)
+Use this repo for backend deployment only.
 
-This repo is a monorepo, but you deploy each part separately:
-- `frontend/` -> Vercel (static React app)
-- `backend/` -> Render (Docker web service)
-- Redis -> Upstash (managed Redis)
+- Root directory: `backend`
+- Runtime: Dockerfile (`backend/Dockerfile`)
+- Health check: `/healthz`
 
-### 1) Create Upstash Redis
+Required variables:
 
-1. Create a Redis database in Upstash.
-2. Copy the TLS connection string and use `rediss://` (not `redis://`).
-3. Keep this value for backend `REDIS_URL`.
-
-### 2) Deploy Backend on Render
-
-1. In Render, create a new **Web Service** from this GitHub repo.
-2. Set:
-- `Root Directory`: `backend`
-- `Environment`: `Docker`
-- `Health Check Path`: `/healthz`
-3. Add environment variables:
-- `OPENROUTER_API_KEY=...` (system flow key)
-- `REDIS_URL=rediss://default:<password>@<endpoint>:6379`
+- `OPENROUTER_API_KEY`
+- `REDIS_URL`
 - `SESSION_TTL_SECONDS=14400`
 - `MODEL_CACHE_TTL_SECONDS=3600`
 - `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`
 - `OPENROUTER_HTTP_REFERER=https://<your-frontend-domain>`
 - `CORS_ORIGINS=https://<your-frontend-domain>,http://localhost:5173`
-4. Deploy and copy the backend URL, for example `https://<backend>.onrender.com`.
 
-Note: `backend/Dockerfile` is configured to bind to `${PORT}` for cloud platforms.
-
-### 3) Deploy Frontend on Vercel
-
-1. In Vercel, import the same GitHub repo.
-2. Set:
-- `Root Directory`: `frontend`
-- `Build Command`: `npm run build`
-- `Output Directory`: `dist`
-3. Add environment variable:
-- `VITE_API_BASE=https://<backend>.onrender.com`
-4. Deploy.
-
-Note: `frontend/vercel.json` includes SPA rewrites so routes like `/session/:id` resolve correctly.
-
-### 4) Final CORS Check
-
-After you get your final Vercel production URL, update backend `CORS_ORIGINS` to include it, then redeploy backend.
-
-### 5) Smoke Test
-
-1. Open frontend URL.
-2. Start a session in `system` mode.
-3. Confirm real-time stream is visible.
-4. Confirm PDF export works after synthesis.
-5. Test `BYOK` with a valid OpenRouter key.
-
-## Key API Endpoints
+## API Endpoints
 
 - `POST /api/roundtable/start`
 - `GET /api/roundtable/stream/{session_id}`
 - `GET /api/models`
 - `POST /api/models/byok`
-- `POST /api/export` (`format: "pdf"`)
+- `POST /api/export` with `{ "format": "pdf" }`
 
 ## Security Notes (BYOK)
 
-- BYOK keys are never stored in Redis or files.
+- BYOK keys are never written to Redis/files.
 - BYOK keys are not returned by APIs.
-- BYOK keys are held in process memory with TTL and deleted at session end.
-- If backend restarts, active BYOK sessions lose their key and cannot continue.
+- BYOK keys are stored in process memory with TTL.
+- Backend restart clears active BYOK keys.
 
-## Testing
-
-Backend:
+## Tests
 
 ```bash
 cd backend
 python -m pytest tests -q
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm test
 ```
