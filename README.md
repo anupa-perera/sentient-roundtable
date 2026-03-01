@@ -19,7 +19,9 @@ Frontend repo:
 ## Project Structure
 
 ```text
-backend/             FastAPI app, orchestration, Redis/OpenRouter/PDF services
+app/                FastAPI app, orchestration, Redis/OpenRouter/PDF services
+tests/              Backend tests
+Dockerfile          Backend runtime image
 docker-compose.yml   Backend + local Redis for development
 ```
 
@@ -46,7 +48,6 @@ Health: `http://localhost:8000/healthz`
 ### Without Docker
 
 ```bash
-cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -58,8 +59,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 Use this repo for backend deployment only.
 
-- Root directory: `backend`
-- Runtime: Dockerfile (`backend/Dockerfile`)
+- Root directory: `/` (repo root)
+- Runtime: Dockerfile (`/Dockerfile`)
 - Health check: `/healthz`
 
 Required variables:
@@ -90,6 +91,5 @@ Required variables:
 ## Tests
 
 ```bash
-cd backend
 python -m pytest tests -q
 ```
