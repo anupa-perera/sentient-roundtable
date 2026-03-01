@@ -1,6 +1,9 @@
-# Sentient Roundtable Backend
+# Sentient Roundtable
 
-This repository contains only the FastAPI backend for Sentient Roundtable.
+This project powers Sentient Roundtable. It runs fixed-round
+multi-model discussions, streams real-time events, executes voting and synthesis,
+and generates a final PDF report. It also supports both system-key and BYOK model
+flows with Redis-backed session state.
 
 Frontend repo:
 - `https://github.com/anupa-perera/sentient-ai-roundtable`
@@ -12,17 +15,24 @@ Frontend repo:
 - Real-time SSE stream with replay/resume support.
 - Two access flows:
   - `system`: server-side key, free models only.
-  - `byok`: user key allows free + paid models, stored in backend RAM for session lifetime only.
+  - `byok`: user key allows free + paid models, stored in service RAM for session lifetime only.
 - Voting and synthesis after all rounds.
 - PDF export via `POST /api/export`.
 
 ## Project Structure
 
 ```text
-app/                FastAPI app, orchestration, Redis/OpenRouter/PDF services
-tests/              Backend tests
-Dockerfile          Backend runtime image
-docker-compose.yml   Backend + local Redis for development
+app/
+  main.py           API app bootstrap and lifecycle
+  routers/          HTTP + SSE endpoints
+  core/             round orchestration, voting, synthesis logic
+  services/         Redis, OpenRouter, PDF, and key-store integrations
+  models/           request/response and domain schemas
+  prompts/          prompt templates for panel, host, voter, synthesis
+tests/              automated service tests
+Dockerfile          container runtime definition
+docker-compose.yml  local service + Redis stack
+requirements.txt    Python dependencies
 ```
 
 ## Environment
@@ -57,7 +67,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## Deploy (Railway/Render)
 
-Use this repo for backend deployment only.
+Use this repo for service deployment.
 
 - Root directory: `/` (repo root)
 - Runtime: Dockerfile (`/Dockerfile`)
@@ -86,7 +96,7 @@ Required variables:
 - BYOK keys are never written to Redis/files.
 - BYOK keys are not returned by APIs.
 - BYOK keys are stored in process memory with TTL.
-- Backend restart clears active BYOK keys.
+- Service restart clears active BYOK keys.
 
 ## Tests
 
