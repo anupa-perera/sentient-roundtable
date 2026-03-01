@@ -65,7 +65,7 @@ export default function App(): JSX.Element {
 
       <footer className="glass border-t border-slate-200/40 px-4 py-3 text-center dark:border-slate-700/40">
         <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-slatewarm dark:text-slate-400">
-          Proof of Concept by Anupa Perera
+          A Proof of Concept by Anupa Perera
         </p>
       </footer>
     </div>
