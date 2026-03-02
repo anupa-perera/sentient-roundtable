@@ -109,8 +109,20 @@ class RoundtableOrchestrator:
                             "token", {"model": active_model, "text": token}
                         ),
                     )
+                    if not response_text.strip():
+                        response_text = self._build_refusal_turn_message(model_id)
+                        await emit_event(
+                            "error",
+                            {
+                                "message": (
+                                    f"Model {model_id} returned an empty response in round {round_num}."
+                                ),
+                                "recoverable": True,
+                                "model": model_id,
+                            },
+                        )
                 except Exception as exc:
-                    response_text = f"[Model {model_id} refused to participate in this round.]"
+                    response_text = self._build_refusal_turn_message(model_id)
                     await emit_event(
                         "error",
                         {
@@ -263,3 +275,8 @@ class RoundtableOrchestrator:
         if not key:
             raise RuntimeError("BYOK session key unavailable. Session may have expired or backend restarted.")
         return key
+
+    @staticmethod
+    def _build_refusal_turn_message(model_id: str) -> str:
+        """Return compact fallback text for missing/failed panel responses."""
+        return "I refused to take part this round"
