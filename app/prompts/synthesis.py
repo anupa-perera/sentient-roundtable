@@ -13,4 +13,5 @@ Structure:
 
 Use plain, simple language with short sentences.
 Avoid jargon and overly complex wording.
+Keep the tone human and natural while staying structured.
 Be authoritative and clear."""
