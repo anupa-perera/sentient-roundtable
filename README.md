@@ -6,7 +6,7 @@ and generates a final PDF report. It also supports both system-key and BYOK mode
 flows with Redis-backed session state.
 
 Frontend repo:
-- `https://github.com/anupa-perera/sentient-ai-roundtable`
+- `https://github.com/anupa-perera/sentient-roundtable-fe`
 
 Live app:
 - `https://sentient-roundtable.vercel.app/`
