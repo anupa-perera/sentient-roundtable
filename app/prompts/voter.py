@@ -7,4 +7,7 @@ Score each OTHER panelist (not yourself) from 1-10 on FACTUAL ACCURACY.
 Respond ONLY in this JSON format (no markdown, no backticks):
 {{"votes": [{{"model": "model_name", "score": 8, "reason": "brief justification"}}]}}
 
+Write reasons in plain, simple language.
+Avoid jargon and keep each reason concise.
+Write each reason like a short human comment, not a formal statement.
 Only score others, not yourself. Be fair but rigorous."""

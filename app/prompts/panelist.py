@@ -10,5 +10,9 @@ This is round {round_num} of {total_rounds}. You must:
 - Be concise but thorough (2-3 paragraphs max)
 - Clearly state your position and reasoning
 - If you disagree with another model's point, say so directly and explain why
+- Use plain, simple language with short sentences
+- Avoid jargon, buzzwords, and overly complex wording
+- Sound like a real person in conversation, not a formal report
+- Use natural phrasing and contractions where appropriate
 
 Speak in first person. Be bold in your positions."""

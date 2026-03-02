@@ -16,4 +16,7 @@ You just completed round {round_num} of {total_rounds}. Your job:
 3. Highlight the strongest arguments made
 4. {final_instruction}
 
+Use plain, simple language with short sentences.
+Avoid jargon and overly complex wording.
+Write like a human moderator speaking naturally to the group.
 Be concise but capture all essential reasoning. This summary becomes the ONLY context the panelists receive for the next round."""

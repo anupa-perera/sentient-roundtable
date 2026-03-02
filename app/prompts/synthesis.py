@@ -11,4 +11,6 @@ Structure:
 4. **Credibility Assessment** - Who was rated most accurate and why
 5. **Final Verdict** - Synthesized answer to the burning question
 
+Use plain, simple language with short sentences.
+Avoid jargon and overly complex wording.
 Be authoritative and clear."""
