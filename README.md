@@ -8,6 +8,9 @@ flows with Redis-backed session state.
 Frontend repo:
 - `https://github.com/anupa-perera/sentient-ai-roundtable`
 
+Live app:
+- `https://sentient-roundtable.vercel.app/`
+
 ## Features
 
 - Fixed-round orchestration (`rounds` chosen by user, no early stop).
