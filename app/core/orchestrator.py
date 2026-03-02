@@ -110,7 +110,7 @@ class RoundtableOrchestrator:
                         ),
                     )
                 except Exception as exc:
-                    response_text = f"[Model {model_id} failed to respond in this turn.]"
+                    response_text = f"[Model {model_id} refused to participate in this round.]"
                     await emit_event(
                         "error",
                         {
