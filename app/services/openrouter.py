@@ -181,7 +181,11 @@ class OpenRouterClient:
                 headers=self._headers(api_key),
                 json=body,
             ) as response:
-                self._raise_for_status("stream", response)
+                if response.status_code >= 400:
+                    raw_error = await response.aread()
+                    detail = self._extract_error_detail(raw_error.decode(errors="replace"))
+                    suffix = f": {detail}" if detail else "."
+                    raise RuntimeError(f"OpenRouter stream failed ({response.status_code}){suffix}")
                 async for line in response.aiter_lines():
                     if not line or not line.startswith("data: "):
                         continue
