@@ -207,7 +207,19 @@ class RoundtableOrchestrator:
                     max_tokens=300,
                     temperature=0.3,
                 )
-                parsed_votes = parse_votes_response(raw_votes, voter, config.models)
+                try:
+                    parsed_votes = parse_votes_response(raw_votes, voter, config.models)
+                except ValueError:
+                    # Treat malformed/non-JSON vote output as abstain for this voter.
+                    await emit_event(
+                        "vote_abstain",
+                        {
+                            "voter": voter,
+                            "reason": "invalid_vote_payload",
+                            "message": "Voter output did not match required JSON schema.",
+                        },
+                    )
+                    continue
                 if parsed_votes.votes:
                     await self.store.append_votes(session_id, parsed_votes)
                     await emit_event("vote", parsed_votes.model_dump())
