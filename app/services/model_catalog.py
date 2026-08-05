@@ -1,4 +1,12 @@
+from decimal import Decimal, InvalidOperation
+
 from app.models.catalog import ModelCatalogEntry
+
+
+CATALOG_CACHE_VERSION = 1
+CACHE_VERSION_KEY = "_catalog_cache_version"
+CACHE_ENTRY_KEY = "entry"
+TIER_CONDITION_KEYS = {"min_prompt_tokens"}
 
 
 def normalize_models(raw_models: list[dict]) -> list[ModelCatalogEntry]:
@@ -31,6 +39,33 @@ def normalize_models(raw_models: list[dict]) -> list[ModelCatalogEntry]:
     return sorted(normalized, key=lambda model: model.name.lower())
 
 
+def serialize_models_for_cache(models: list[ModelCatalogEntry]) -> list[dict]:
+    """Serialize validated entries with an explicit cache schema version."""
+    return [
+        {
+            CACHE_VERSION_KEY: CATALOG_CACHE_VERSION,
+            CACHE_ENTRY_KEY: model.model_dump(mode="json"),
+        }
+        for model in models
+    ]
+
+
+def deserialize_cached_models(cached_models: list[dict]) -> list[ModelCatalogEntry]:
+    """Read current cache entries while remaining compatible with legacy raw payloads."""
+    models: list[ModelCatalogEntry] = []
+    legacy_entries: list[dict] = []
+    for cached_model in cached_models:
+        if (
+            isinstance(cached_model, dict)
+            and cached_model.get(CACHE_VERSION_KEY) == CATALOG_CACHE_VERSION
+        ):
+            models.append(ModelCatalogEntry.model_validate(cached_model.get(CACHE_ENTRY_KEY)))
+        else:
+            legacy_entries.append(cached_model)
+    models.extend(normalize_models(legacy_entries))
+    return sorted(models, key=lambda model: model.name.lower())
+
+
 def filter_free_models(models: list[ModelCatalogEntry]) -> list[ModelCatalogEntry]:
     """Return free-tier models only."""
     return [model for model in models if model.is_free]
@@ -38,9 +73,7 @@ def filter_free_models(models: list[ModelCatalogEntry]) -> list[ModelCatalogEntr
 
 def _is_free_model(pricing: dict[str, object]) -> bool:
     """Classify a model as free only when every applicable tier is free."""
-    prompt = pricing.get("prompt")
-    completion = pricing.get("completion")
-    if not (_numeric_zero(prompt) and _numeric_zero(completion)):
+    if not _all_pricing_dimensions_are_zero(pricing, ignored_keys={"overrides"}):
         return False
 
     overrides = pricing.get("overrides")
@@ -52,11 +85,24 @@ def _is_free_model(pricing: dict[str, object]) -> bool:
     for override in overrides:
         if not isinstance(override, dict):
             return False
-        tier_prompt = override.get("prompt", prompt)
-        tier_completion = override.get("completion", completion)
-        if not (_numeric_zero(tier_prompt) and _numeric_zero(tier_completion)):
+        if not _all_pricing_dimensions_are_zero(
+            override,
+            ignored_keys=TIER_CONDITION_KEYS,
+        ):
             return False
     return True
+
+
+def _all_pricing_dimensions_are_zero(
+    pricing: dict[str, object],
+    *,
+    ignored_keys: set[str],
+) -> bool:
+    """Require all present charge fields to be numeric zero."""
+    charge_values = [
+        value for key, value in pricing.items() if str(key) not in ignored_keys
+    ]
+    return bool(charge_values) and all(_numeric_zero(value) for value in charge_values)
 
 
 def _normalize_pricing(
@@ -79,5 +125,8 @@ def _numeric_zero(value: object) -> bool:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return float(value) == 0.0
     if isinstance(value, str):
-        return value.strip() in {"0", "0.0", "0.00"}
+        try:
+            return Decimal(value.strip()).is_zero()
+        except InvalidOperation:
+            return False
     return False

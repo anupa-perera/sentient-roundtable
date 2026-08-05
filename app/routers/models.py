@@ -4,7 +4,12 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps import get_openrouter, get_settings, get_store
-from app.services.model_catalog import filter_free_models, normalize_models
+from app.services.model_catalog import (
+    deserialize_cached_models,
+    filter_free_models,
+    normalize_models,
+    serialize_models_for_cache,
+)
 from app.services.openrouter import OpenRouterClient
 from app.services.redis_store import RedisStore
 from app.config import Settings
@@ -30,22 +35,30 @@ async def list_system_models(
 
     cached = await store.get_cached_system_models()
     if cached is not None:
-        models = [entry for entry in normalize_models(cached)]
-    else:
         try:
-            raw_models = await openrouter.list_models(settings.openrouter_api_key)
-            models = normalize_models(raw_models)
-            await store.set_cached_system_models(
-                [entry.model_dump(mode="json") for entry in models]
-            )
-        except Exception as exc:
-            cached_fallback = await store.get_cached_system_models()
-            if cached_fallback is None:
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Unable to load model catalog from OpenRouter: {exc}",
-                ) from exc
-            models = normalize_models(cached_fallback)
+            models = deserialize_cached_models(cached)
+        except Exception:
+            cached = None
+        else:
+            return [entry.model_dump() for entry in filter_free_models(models)]
+
+    try:
+        raw_models = await openrouter.list_models(settings.openrouter_api_key)
+        models = normalize_models(raw_models)
+        await store.set_cached_system_models(serialize_models_for_cache(models))
+    except Exception as exc:
+        cached_fallback = await store.get_cached_system_models()
+        if cached_fallback is not None:
+            try:
+                models = deserialize_cached_models(cached_fallback)
+            except Exception:
+                pass
+            else:
+                return [entry.model_dump() for entry in filter_free_models(models)]
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to load model catalog from OpenRouter: {exc}",
+        ) from exc
 
     return [entry.model_dump() for entry in filter_free_models(models)]
 

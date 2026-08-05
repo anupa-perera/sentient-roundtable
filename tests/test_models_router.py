@@ -45,6 +45,13 @@ def _tiered_free_model() -> dict:
     }
 
 
+def _conditionally_paid_model() -> dict:
+    model = _tiered_free_model()
+    model["id"] = "provider/conditionally-paid"
+    model["pricing"]["overrides"][0]["prompt"] = "0.000001"
+    return model
+
+
 async def test_list_system_models_caches_only_normalized_entries() -> None:
     """Structured upstream fields must not be persisted in the internal cache."""
     store = FakeStore()
@@ -59,8 +66,9 @@ async def test_list_system_models_caches_only_normalized_entries() -> None:
 
     assert len(response) == 1
     assert store.cached is not None
-    assert store.cached[0]["pricing"] == {"prompt": "0", "completion": "0"}
-    assert "overrides" not in store.cached[0]["pricing"]
+    cached_entry = store.cached[0]["entry"]
+    assert cached_entry["pricing"] == {"prompt": "0", "completion": "0"}
+    assert "overrides" not in cached_entry["pricing"]
 
 
 async def test_cached_structured_pricing_remains_backward_compatible() -> None:
@@ -79,6 +87,28 @@ async def test_cached_structured_pricing_remains_backward_compatible() -> None:
     assert openrouter.calls == 0
 
 
+async def test_paid_tier_stays_filtered_after_cache_round_trip() -> None:
+    """A validated paid decision must survive normalized cache serialization."""
+    store = FakeStore()
+    openrouter = FakeOpenRouter([_conditionally_paid_model()])
+    settings = SimpleNamespace(openrouter_api_key="system-key")
+
+    first_response = await list_system_models(  # type: ignore[arg-type]
+        store=store,
+        settings=settings,
+        openrouter=openrouter,
+    )
+    second_response = await list_system_models(  # type: ignore[arg-type]
+        store=store,
+        settings=settings,
+        openrouter=openrouter,
+    )
+
+    assert first_response == []
+    assert second_response == []
+    assert openrouter.calls == 1
+
+
 async def test_roundtable_loader_caches_only_normalized_entries() -> None:
     """Session validation must use the same safe cache representation."""
     store = FakeStore()
@@ -93,4 +123,7 @@ async def test_roundtable_loader_caches_only_normalized_entries() -> None:
 
     assert models[0].is_free is True
     assert store.cached is not None
-    assert store.cached[0]["pricing"] == {"prompt": "0", "completion": "0"}
+    assert store.cached[0]["entry"]["pricing"] == {
+        "prompt": "0",
+        "completion": "0",
+    }

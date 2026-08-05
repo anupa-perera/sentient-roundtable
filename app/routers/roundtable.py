@@ -22,7 +22,11 @@ from app.deps import (
 from app.models.session import SessionConfig, SessionStartRequest, SessionStartResponse
 from app.models.types import AuthMode, Phase
 from app.services.key_store import EphemeralKeyStore
-from app.services.model_catalog import normalize_models
+from app.services.model_catalog import (
+    deserialize_cached_models,
+    normalize_models,
+    serialize_models_for_cache,
+)
 from app.services.openrouter import OpenRouterClient
 from app.services.redis_store import RedisStore
 
@@ -177,16 +181,20 @@ async def _load_system_catalog(
     """Load model catalog using cache-first strategy for the system key."""
     cached = await store.get_cached_system_models()
     if cached is not None:
-        return normalize_models(cached)
+        try:
+            return deserialize_cached_models(cached)
+        except Exception:
+            pass
     try:
         raw_models = await openrouter.list_models(settings.openrouter_api_key)
         models = normalize_models(raw_models)
-        await store.set_cached_system_models(
-            [entry.model_dump(mode="json") for entry in models]
-        )
+        await store.set_cached_system_models(serialize_models_for_cache(models))
         return models
     except Exception:
         cached_fallback = await store.get_cached_system_models()
         if cached_fallback is not None:
-            return normalize_models(cached_fallback)
+            try:
+                return deserialize_cached_models(cached_fallback)
+            except Exception:
+                pass
         raise
