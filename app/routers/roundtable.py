@@ -180,8 +180,11 @@ async def _load_system_catalog(
         return normalize_models(cached)
     try:
         raw_models = await openrouter.list_models(settings.openrouter_api_key)
-        await store.set_cached_system_models(raw_models)
-        return normalize_models(raw_models)
+        models = normalize_models(raw_models)
+        await store.set_cached_system_models(
+            [entry.model_dump(mode="json") for entry in models]
+        )
+        return models
     except Exception:
         cached_fallback = await store.get_cached_system_models()
         if cached_fallback is not None:

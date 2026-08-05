@@ -34,8 +34,10 @@ async def list_system_models(
     else:
         try:
             raw_models = await openrouter.list_models(settings.openrouter_api_key)
-            await store.set_cached_system_models(raw_models)
             models = normalize_models(raw_models)
+            await store.set_cached_system_models(
+                [entry.model_dump(mode="json") for entry in models]
+            )
         except Exception as exc:
             cached_fallback = await store.get_cached_system_models()
             if cached_fallback is None:
@@ -59,4 +61,3 @@ async def list_byok_models(
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Unable to load BYOK models: {exc}") from exc
     return [entry.model_dump() for entry in normalize_models(raw_models)]
-
