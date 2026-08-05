@@ -87,6 +87,46 @@ async def test_cached_structured_pricing_remains_backward_compatible() -> None:
     assert openrouter.calls == 0
 
 
+async def test_corrupt_versioned_cache_is_replaced_from_openrouter() -> None:
+    """A bad internal cache entry should behave as a miss instead of causing a 500."""
+    store = FakeStore(
+        cached=[{"_catalog_cache_version": 1, "entry": {"id": "incomplete"}}]
+    )
+    openrouter = FakeOpenRouter([_tiered_free_model()])
+    settings = SimpleNamespace(openrouter_api_key="system-key")
+
+    response = await list_system_models(  # type: ignore[arg-type]
+        store=store,
+        settings=settings,
+        openrouter=openrouter,
+    )
+
+    assert len(response) == 1
+    assert openrouter.calls == 1
+    assert store.cached is not None
+    assert store.cached[0]["entry"]["id"] == "provider/free"
+
+
+async def test_unknown_cache_version_is_replaced_from_openrouter() -> None:
+    """A future or malformed cache schema must not appear to be an empty catalog."""
+    store = FakeStore(
+        cached=[{"_catalog_cache_version": 2, "entry": {"id": "future"}}]
+    )
+    openrouter = FakeOpenRouter([_tiered_free_model()])
+    settings = SimpleNamespace(openrouter_api_key="system-key")
+
+    response = await list_system_models(  # type: ignore[arg-type]
+        store=store,
+        settings=settings,
+        openrouter=openrouter,
+    )
+
+    assert len(response) == 1
+    assert openrouter.calls == 1
+    assert store.cached is not None
+    assert store.cached[0]["_catalog_cache_version"] == 1
+
+
 async def test_paid_tier_stays_filtered_after_cache_round_trip() -> None:
     """A validated paid decision must survive normalized cache serialization."""
     store = FakeStore()
@@ -127,3 +167,45 @@ async def test_roundtable_loader_caches_only_normalized_entries() -> None:
         "prompt": "0",
         "completion": "0",
     }
+
+
+async def test_roundtable_loader_preserves_paid_decision_from_cache() -> None:
+    """System session validation must not lose tier charges on a cache hit."""
+    store = FakeStore()
+    openrouter = FakeOpenRouter([_conditionally_paid_model()])
+    settings = SimpleNamespace(openrouter_api_key="system-key")
+
+    first_models = await _load_system_catalog(  # type: ignore[arg-type]
+        store=store,
+        openrouter=openrouter,
+        settings=settings,
+    )
+    second_models = await _load_system_catalog(  # type: ignore[arg-type]
+        store=store,
+        openrouter=openrouter,
+        settings=settings,
+    )
+
+    assert first_models[0].is_free is False
+    assert second_models[0].is_free is False
+    assert openrouter.calls == 1
+
+
+async def test_roundtable_loader_refreshes_unknown_cache_version() -> None:
+    """Session validation should recover from an unsupported catalog cache schema."""
+    store = FakeStore(
+        cached=[{"_catalog_cache_version": 2, "entry": {"id": "future"}}]
+    )
+    openrouter = FakeOpenRouter([_tiered_free_model()])
+    settings = SimpleNamespace(openrouter_api_key="system-key")
+
+    models = await _load_system_catalog(  # type: ignore[arg-type]
+        store=store,
+        openrouter=openrouter,
+        settings=settings,
+    )
+
+    assert len(models) == 1
+    assert openrouter.calls == 1
+    assert store.cached is not None
+    assert store.cached[0]["_catalog_cache_version"] == 1

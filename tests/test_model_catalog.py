@@ -140,6 +140,23 @@ def test_cache_round_trip_preserves_validated_free_classification() -> None:
     assert restored[0].is_free is False
 
 
+def test_transitional_unversioned_paid_decision_remains_paid() -> None:
+    """The previous release's normalized cache must not recompute a paid entry."""
+    transitional_cache = [
+        {
+            "id": "provider/conditionally-paid",
+            "name": "Conditionally paid",
+            "pricing": {"prompt": "0", "completion": "0"},
+            "context_length": None,
+            "is_free": False,
+        }
+    ]
+
+    restored = deserialize_cached_models(transitional_cache)
+
+    assert restored[0].is_free is False
+
+
 def test_unknown_pricing_shape_is_conservatively_not_free() -> None:
     """Malformed external pricing must not enable a potentially paid model."""
     models = normalize_models(
@@ -152,4 +169,13 @@ def test_unknown_pricing_shape_is_conservatively_not_free() -> None:
 
     assert len(models) == 1
     assert models[0].pricing == {}
+    assert models[0].is_free is False
+
+
+def test_missing_token_prices_are_conservatively_not_free() -> None:
+    """Zero auxiliary charges alone do not prove token usage is free."""
+    models = normalize_models(
+        [{"id": "provider/incomplete-pricing", "pricing": {"request": "0"}}]
+    )
+
     assert models[0].is_free is False

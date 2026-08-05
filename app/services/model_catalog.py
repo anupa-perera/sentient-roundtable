@@ -55,13 +55,17 @@ def deserialize_cached_models(cached_models: list[dict]) -> list[ModelCatalogEnt
     models: list[ModelCatalogEntry] = []
     legacy_entries: list[dict] = []
     for cached_model in cached_models:
-        if (
-            isinstance(cached_model, dict)
-            and cached_model.get(CACHE_VERSION_KEY) == CATALOG_CACHE_VERSION
-        ):
+        if isinstance(cached_model, dict) and CACHE_VERSION_KEY in cached_model:
+            if cached_model.get(CACHE_VERSION_KEY) != CATALOG_CACHE_VERSION:
+                raise ValueError("Unsupported model catalog cache version.")
             models.append(ModelCatalogEntry.model_validate(cached_model.get(CACHE_ENTRY_KEY)))
-        else:
-            legacy_entries.append(cached_model)
+            continue
+        if isinstance(cached_model, dict) and "is_free" in cached_model:
+            if cached_model.get("is_free") is not False:
+                raise ValueError("Unversioned free-model decisions must be refreshed.")
+            models.append(ModelCatalogEntry.model_validate(cached_model))
+            continue
+        legacy_entries.append(cached_model)
     models.extend(normalize_models(legacy_entries))
     return sorted(models, key=lambda model: model.name.lower())
 
@@ -73,6 +77,11 @@ def filter_free_models(models: list[ModelCatalogEntry]) -> list[ModelCatalogEntr
 
 def _is_free_model(pricing: dict[str, object]) -> bool:
     """Classify a model as free only when every applicable tier is free."""
+    if not (
+        _numeric_zero(pricing.get("prompt"))
+        and _numeric_zero(pricing.get("completion"))
+    ):
+        return False
     if not _all_pricing_dimensions_are_zero(pricing, ignored_keys={"overrides"}):
         return False
 
